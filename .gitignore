@@ -29,6 +29,8 @@ go.work
 # Project specific
 bin/
 /tmp/
+coverage.out
+coverage.html
 
 # Docker/Testcontainers related
 testcontainers-go.sock

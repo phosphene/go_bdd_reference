@@ -7,3 +7,8 @@ Feature: System Health
     Given the application is running
     When I request the health status
     Then the response should be "OK"
+    And the response status should be 200
+
+  Scenario: Requesting an unknown endpoint
+    When I request an unknown route
+    Then the response status should be 404

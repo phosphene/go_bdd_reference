@@ -15,9 +15,10 @@ import (
 )
 
 var (
-	appHost      string
-	appPort      string
-	responseBody string
+	appHost        string
+	appPort        string
+	responseBody   string
+	responseStatus int
 )
 
 func TestMain(m *testing.M) {
@@ -108,11 +109,31 @@ func iRequestTheHealthStatus() error {
 	}
 	defer resp.Body.Close()
 
+	responseStatus = resp.StatusCode
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
 	responseBody = string(body)
+	return nil
+}
+
+func iRequestAnUnknownRoute() error {
+	url := fmt.Sprintf("http://%s:%s/unknown", appHost, appPort)
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	responseStatus = resp.StatusCode
+	return nil
+}
+
+func theResponseStatusShouldBe(expected int) error {
+	if responseStatus != expected {
+		return fmt.Errorf("expected status %d, but got %d", expected, responseStatus)
+	}
 	return nil
 }
 
@@ -126,5 +147,7 @@ func theResponseShouldBe(expected string) error {
 func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^the application is running$`, theApplicationIsRunning)
 	sc.Step(`^I request the health status$`, iRequestTheHealthStatus)
+	sc.Step(`^I request an unknown route$`, iRequestAnUnknownRoute)
+	sc.Step(`^the response status should be (\d+)$`, theResponseStatusShouldBe)
 	sc.Step(`^the response should be "([^"]*)"$`, theResponseShouldBe)
 }

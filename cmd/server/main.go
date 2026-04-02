@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+
+	handlers "github.com/phosphene/go_bdd_reference/internal/http"
 )
 
 func main() {
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "OK")
-	})
+	http.HandleFunc("/health", handlers.HealthHandler)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -18,7 +18,7 @@ func main() {
 
 	fmt.Printf("Server starting on port %s...\n", port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
-		fmt.Printf("Error starting server: %s\n", err)
+		fmt.Printf("Error starting server: %v\n", err)
 		os.Exit(1)
 	}
 }
