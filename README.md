@@ -1,105 +1,56 @@
-# Go BDD Reference: A "Learned" Systems Approach
+# **Go BDD Reference: Systems Behavioral Proofs and Contractual Verification**
 
-This repository serves as a reference implementation for modern, production-grade Go services. It prioritizes **Reliability**, **Verifiability**, and **Maintainability** through a strict Gherkin-style BDD framework and hermetic orchestration.
+This repository contains a reference implementation for the formal verification of system behavior within Go environments. It utilizes Behavior-Driven Development (BDD) and End-to-End (E2E) testing to prove that a system adheres to its defined contracts within a deterministic execution environment.
 
----
+## **Methodology: Outside-In Verification**
 
-## **The "What"**
-A minimal, decoupled Go service demonstrating:
-*   **Hexagonal Lite Architecture**: Decoupling domain logic from delivery (HTTP) and infrastructure (Docker).
-*   **Hermetic E2E Testing**: Using [Testcontainers](https://testcontainers.com/) to programmatically orchestrate ephemeral Docker Compose stacks for every test run.
-*   **Gherkin BDD**: Human-readable behavioral specifications using [Godog](https://github.com/cucumber/godog).
-*   **Modern Go (1.24+)**: Leveraging the latest stable idioms, iterators, and strict linting.
+The architecture employs an "Outside-In" verification sequence to establish system integrity. This methodology ensures that the external contract is validated as the primary indicator of system correctness.
 
----
+1. **Contract Specification:** Definition of observable behavior via Gherkin specifications. These serve as the formal requirements for the system boundary.  
+2. **Environmental Modeling:** Inclusion of child dependencies—such as persistent state stores and message brokers—within the test boundary to verify the behavior of all state-bearing components.  
+3. **Behavioral Proof:** Execution of automated E2E suites against live, isolated environments. This provides the high-level proof of behavior, which is subsequently supported by unit-level verification.
 
-## **The "Why"**
-Traditional testing often falls into two traps:
-1.  **Mock-Heavy Unit Tests**: They prove the code does what the developer *thinks* it does, but often miss integration failures (network issues, SQL syntax, container misconfiguration).
-2.  **Brittle Manual QA**: Slow, non-deterministic, and impossible to scale.
+## **Integrated Dependency Verification**
 
-### **Our Testing Philosophy**
-We follow a **Tracer Bullet** approach:
-*   **Verify the System, Not the Function**: High-level BDD tests prove the system works as a "black box" in a real network environment.
-*   **Zero-Drift Infrastructure**: If a test requires a database (e.g., Postgres, Dolt), it must be defined in the test's `docker-compose.yml`. No reliance on external "staging" environments.
-*   **Consumer-Driven Interfaces**: We "discover" interfaces when we need to decouple, rather than pre-abstracting everything.
+This implementation treats child dependencies as first-class entities within the behavioral proof. By including PostgreSQL, Redis, or other infrastructure directly in the verification loop, the system achieves a comprehensive proof of the following:
 
----
+* **Data Invariants:** Validation that system operations result in the precise persistent state required by the contract.  
+* **Protocol Parity:** Verification of the interaction logic between the service and its data dependencies under live conditions.  
+* **Operational Consistency:** Execution of tests in environments that maintain parity with the production runtime configuration.
 
-## **Best Practices & Standards**
+## **Environmental Determinism**
 
-This project strictly adheres to the [Go Modern Standards Guide](file:///Users/edphillips/projects/new/go_bdd_reference/shared/GoModernStandardsGuide.md). Core principles include:
+System verification is executed within orchestrated containers to ensure total environmental determinism.
 
-1.  **Explicit Dependency Injection**: Avoid `func init()` and global state. All dependencies (DBs, clients, loggers) are passed explicitly to constructors.
-2.  **Error Wrapping & Context**: Never just return a raw error. Use `%w` to wrap errors with context: `fmt.Errorf("user.Register(%s): %w", username, err)`.
-3.  **Hermetic Environments**: The system must be able to boot and verify itself entirely within Docker, ensuring a "zero-drift" developer experience.
-4.  **Standard Layout**: Implementation details are confined to `internal/` packages to prevent leakage and ensure a clean public API.
+* **Infrastructure Isolation:** Each test suite triggers an ephemeral infrastructure lifecycle using testcontainers-go, ensuring zero interference between runs.  
+* **Baseline State Control:** State-bearing services are initialized to a known baseline, facilitating idempotent and repeatable proofs.  
+* **Execution Stability:** Orchestration eliminates environmental drift, ensuring that behavioral proofs remain consistent across local and distributed execution contexts.
 
----
+## **Collaborative Verification Stack**
 
-## **Testing Patterns**
+This framework functions as a high-level verification layer that complements a multi-tiered testing strategy.
 
-### **Table-Driven Tests (TDT)**
-For internal logic and delivery handlers, we use Table-Driven Tests. This pattern centralizes test logic, making it easy to add new cases (edge cases, error states) without duplicating boilerplate.
+* **Functional Augmentation:** The E2E suite provides a behavioral anchor that informs and validates the lower-level unit tests and mocks.  
+* **Technical Proofs:** While unit-level tests verify internal logic branches, the BDD suite proves the system's compliance with its overarching architectural contract.  
+* **Agile Traceability:** Gherkin specifications provide a mathematically consistent link between Agile user stories and the executable code, ensuring that the engineering output is a direct proof of the requirement.
 
-```go
-func TestHealthHandler(t *testing.T) {
-    tests := []struct {
-        name           string
-        method         string
-        expectedStatus int
-    }{
-        {"Valid GET", http.MethodGet, http.StatusOK},
-        {"Invalid POST", http.MethodPost, http.StatusMethodNotAllowed},
-    }
+## **Project Structure**
 
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            // ... Arrange, Act, Assert
-        })
-    }
-}
-```
+* **/features**: Formal Gherkin behavioral contracts.  
+* **/internal**: Domain logic and system implementation.  
+* **/test**: Orchestration logic for containers and child dependencies.
 
-### **The AAA Pattern**
-We structure all tests following the **Arrange, Act, Assert** pattern to ensure clarity:
-1.  **Arrange**: Set up the SUT (System Under Test) and any mocks/stubs.
-2.  **Act**: Execute the primary function or API call.
-3.  **Assert**: Verify the results using `testify/assert` or `require`.
-
----
-
-## **Getting Started**
+## **Execution**
 
 ### **Prerequisites**
-*   **Go 1.24+**
-*   **Docker Daemon** (OrbStack, Docker Desktop, or Colima)
 
-### **Execution**
-Run the entire suite (unit + BDD) with a single command:
-```bash
-make test
-```
+* Go 1.x  
+* Docker Engine
 
-### **Test Coverage**
-Generate a line-by-line coverage report:
-```bash
-make coverage
-```
-This will:
-1.  Run all tests with the `-coverprofile` flag.
-2.  Print a text-based summary to the console.
-3.  Generate an interactive HTML report at `coverage.html`.
+### **Running Proofs**
 
----
+go test ./test/...
 
-## **Project Layout**
-```text
-.
-├── cmd/server           # Entry point (Keep thin)
-├── internal/            # Private logic (Non-importable)
-├── features/            # Gherkin .feature specifications
-├── test/                # BDD runner and Testcontainers orchestration
-├── shared/              # Axiomatic standards and implementation guides
-└── Makefile             # Automation for test, lint, and build
-```
+The execution logs detail the orchestration of child dependencies and the subsequent verification of the specified behaviors against the live system contract.
+
+*A technical reference for contract-driven engineering and behavioral verification.*
