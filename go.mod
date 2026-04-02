@@ -4,6 +4,7 @@ go 1.26.1
 
 require (
 	github.com/cucumber/godog v0.15.1
+	github.com/lib/pq v1.12.1
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.41.0
 	github.com/testcontainers/testcontainers-go/modules/compose v0.41.0

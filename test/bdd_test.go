@@ -1,7 +1,10 @@
 package test
 
 import (
+	"bytes"
 	"context"
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +13,7 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
+	_ "github.com/lib/pq"
 	"github.com/testcontainers/testcontainers-go/modules/compose"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -17,6 +21,7 @@ import (
 var (
 	appHost        string
 	appPort        string
+	dbConn         *sql.DB
 	responseBody   string
 	responseStatus int
 )
@@ -66,9 +71,41 @@ func TestMain(m *testing.M) {
 	appHost = host
 	appPort = mappedPort.Port()
 
-	fmt.Printf("App is running at %s:%s\n", appHost, appPort)
+	// 5. Discover Postgres and Connect
+	dbContainer, err := composeStack.ServiceContainer(ctx, "db")
+	if err != nil {
+		fmt.Printf("could not get db container: %v\n", err)
+		_ = composeStack.Down(ctx, compose.RemoveOrphans(true))
+		os.Exit(1)
+	}
 
-	// 5. Run Tests
+	dbHost, err := dbContainer.Host(ctx)
+	if err != nil {
+		fmt.Printf("could not get db host: %v\n", err)
+		_ = composeStack.Down(ctx, compose.RemoveOrphans(true))
+		os.Exit(1)
+	}
+
+	dbMappedPort, err := dbContainer.MappedPort(ctx, "5432/tcp")
+	if err != nil {
+		fmt.Printf("could not get db mapped port: %v\n", err)
+		_ = composeStack.Down(ctx, compose.RemoveOrphans(true))
+		os.Exit(1)
+	}
+
+	connStr := fmt.Sprintf("host=%s port=%s user=user password=password dbname=userdb sslmode=disable",
+		dbHost, dbMappedPort.Port())
+	dbConn, err = sql.Open("postgres", connStr)
+	if err != nil {
+		fmt.Printf("could not connect to db from test runner: %v\n", err)
+		_ = composeStack.Down(ctx, compose.RemoveOrphans(true))
+		os.Exit(1)
+	}
+	defer dbConn.Close()
+
+	fmt.Printf("App running at %s:%s, DB at %s:%s\n", appHost, appPort, dbHost, dbMappedPort.Port())
+
+	// 6. Run Tests
 	exitCode := m.Run()
 
 	// 6. Cleanup
@@ -144,10 +181,53 @@ func theResponseShouldBe(expected string) error {
 	return nil
 }
 
+func theRegistrationServiceIsAvailable() error {
+	if appHost == "" || appPort == "" || dbConn == nil {
+		return fmt.Errorf("registration service dependencies not found")
+	}
+	return dbConn.Ping()
+}
+
+func iRegisterAUser(email, name string) error {
+	url := fmt.Sprintf("http://%s:%s/users", appHost, appPort)
+	payload := map[string]string{
+		"email": email,
+		"name":  name,
+	}
+	body, _ := json.Marshal(payload)
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	responseStatus = resp.StatusCode
+	respBody, _ := io.ReadAll(resp.Body)
+	responseBody = string(respBody)
+	return nil
+}
+
+func theUserShouldExistInTheDatabase(email string) error {
+	var count int
+	query := "SELECT count(*) FROM users WHERE email = $1"
+	err := dbConn.QueryRow(query, email).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to query database: %w", err)
+	}
+	if count == 0 {
+		return fmt.Errorf("user with email %q not found in database", email)
+	}
+	return nil
+}
+
 func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^the application is running$`, theApplicationIsRunning)
+	sc.Step(`^the registration service is available$`, theRegistrationServiceIsAvailable)
 	sc.Step(`^I request the health status$`, iRequestTheHealthStatus)
 	sc.Step(`^I request an unknown route$`, iRequestAnUnknownRoute)
+	sc.Step(`^I register a user with email "([^"]*)" and name "([^"]*)"$`, iRegisterAUser)
 	sc.Step(`^the response status should be (\d+)$`, theResponseStatusShouldBe)
 	sc.Step(`^the response should be "([^"]*)"$`, theResponseShouldBe)
+	sc.Step(`^the user "([^"]*)" should exist in the database$`, theUserShouldExistInTheDatabase)
 }

@@ -32,7 +32,27 @@ This framework functions as a high-level verification layer that complements a m
 
 * **Functional Augmentation:** The E2E suite provides a behavioral anchor that informs and validates the lower-level unit tests and mocks.  
 * **Technical Proofs:** While unit-level tests verify internal logic branches, the BDD suite proves the system's compliance with its overarching architectural contract.  
-* **Agile Traceability:** Gherkin specifications provide a mathematically consistent link between Agile user stories and the executable code, ensuring that the engineering output is a direct proof of the requirement.
+* **Agile Traceability**: Gherkin specifications provide a mathematically consistent link between Agile user stories and the executable code, ensuring that the engineering output is a direct proof of the requirement.
+
+## **Technical Proof Example: User Registration**
+
+The implementation of the **User Registration** feature serves as a concrete proof of the methodological adherence defined in this repository.
+
+### **Contract Specification**
+The system's behavioral requirements are codified in `user_registration.feature`. This specification serves as the formal requirement for both the API interface and the persistent state integrity.
+
+```gherkin
+  Scenario: Successful registration results in persistent state
+    Given the registration service is available
+    When I register a user with email "alice@example.com" and name "Alice"
+    Then the response status should be 201
+    And the user "alice@example.com" should exist in the database
+```
+
+### **Integrated Verification Logic**
+* **Environmental Modeling**: The verification suite programmatically orchestrates a **PostgreSQL 16** container, ensuring that the test environment matches the operational configuration.
+* **Data Invariant Verification**: Upon a successful API response, the test runner establishes a direct connection to the PostgreSQL container to verify that the specified state has been mathematically achieved within the data layer.
+* **Hermetic Execution**: Each scenario executes against an isolated environment, ensuring that the proof of behavior is independent of external system state.
 
 ## **Project Structure**
 
