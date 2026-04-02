@@ -28,10 +28,44 @@ We follow a **Tracer Bullet** approach:
 
 ## **Best Practices & Standards**
 
-Follow the [Go Modern Standards Guide](file:///Users/edphillips/projects/new/go_bdd_reference/shared/GoModernStandardsGuide.md) in the `shared/` directory for detailed rules on:
-1.  **Syntax**: Prefer `for range n` over verbose loops; always wrap errors with context (`fmt.Errorf("...: %w", err)`).
-2.  **Design**: Keep templates "dumb," keep constructors explicit (no `init()` logic), and use Functional Options for complex setup.
-3.  **Testing**: Use the AAA (Arrange, Act, Assert) pattern and table-driven tests for internal logic.
+This project strictly adheres to the [Go Modern Standards Guide](file:///Users/edphillips/projects/new/go_bdd_reference/shared/GoModernStandardsGuide.md). Core principles include:
+
+1.  **Explicit Dependency Injection**: Avoid `func init()` and global state. All dependencies (DBs, clients, loggers) are passed explicitly to constructors.
+2.  **Error Wrapping & Context**: Never just return a raw error. Use `%w` to wrap errors with context: `fmt.Errorf("user.Register(%s): %w", username, err)`.
+3.  **Hermetic Environments**: The system must be able to boot and verify itself entirely within Docker, ensuring a "zero-drift" developer experience.
+4.  **Standard Layout**: Implementation details are confined to `internal/` packages to prevent leakage and ensure a clean public API.
+
+---
+
+## **Testing Patterns**
+
+### **Table-Driven Tests (TDT)**
+For internal logic and delivery handlers, we use Table-Driven Tests. This pattern centralizes test logic, making it easy to add new cases (edge cases, error states) without duplicating boilerplate.
+
+```go
+func TestHealthHandler(t *testing.T) {
+    tests := []struct {
+        name           string
+        method         string
+        expectedStatus int
+    }{
+        {"Valid GET", http.MethodGet, http.StatusOK},
+        {"Invalid POST", http.MethodPost, http.StatusMethodNotAllowed},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // ... Arrange, Act, Assert
+        })
+    }
+}
+```
+
+### **The AAA Pattern**
+We structure all tests following the **Arrange, Act, Assert** pattern to ensure clarity:
+1.  **Arrange**: Set up the SUT (System Under Test) and any mocks/stubs.
+2.  **Act**: Execute the primary function or API call.
+3.  **Assert**: Verify the results using `testify/assert` or `require`.
 
 ---
 
